@@ -978,8 +978,8 @@ suite('Go Debug Adapter', function () {
 				mode: 'auto',
 				program: PROGRAM,
 				stopOnEntry: false,
-				logFile: logPath,
-				trace: 'verbose'
+				// logFile: logPath,
+				// trace: 'verbose'
 			};
 			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
 
