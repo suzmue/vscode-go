@@ -903,7 +903,7 @@ suite('Go Debug Adapter', function () {
 		});
 	});
 
-	suite.only('disconnect', () => {
+	suite('disconnect', () => {
 		// The teardown code for the Go Debug Adapter test suite issues a disconnectRequest.
 		// In order for these tests to pass, the debug adapter must not fail if a
 		// disconnectRequest is sent after it has already disconnected.
