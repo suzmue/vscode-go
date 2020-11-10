@@ -903,7 +903,7 @@ suite('Go Debug Adapter', function () {
 		});
 	});
 
-	suite('disconnect', () => {
+	suite.only('disconnect', () => {
 		// The teardown code for the Go Debug Adapter test suite issues a disconnectRequest.
 		// In order for these tests to pass, the debug adapter must not fail if a
 		// disconnectRequest is sent after it has already disconnected.
@@ -951,7 +951,9 @@ suite('Go Debug Adapter', function () {
 				request: 'launch',
 				mode: 'auto',
 				program: PROGRAM,
-				stopOnEntry: false
+				stopOnEntry: false,
+				logFile: logPath,
+				trace: 'verbose'
 			};
 			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
 
@@ -1002,7 +1004,9 @@ suite('Go Debug Adapter', function () {
 				request: 'launch',
 				mode: 'auto',
 				program: PROGRAM,
-				stopOnEntry: true
+				stopOnEntry: true,
+				logFile: logPath,
+				trace: 'verbose'
 			};
 			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
 
@@ -1032,7 +1036,9 @@ suite('Go Debug Adapter', function () {
 				request: 'launch',
 				mode: 'auto',
 				program: PROGRAM,
-				stopOnEntry: false
+				stopOnEntry: false,
+				logFile: logPath,
+				trace: 'verbose'
 			};
 			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
 
@@ -1056,6 +1062,8 @@ suite('Go Debug Adapter', function () {
 				request: 'launch',
 				mode: 'auto',
 				program: PROGRAM,
+				logFile: logPath,
+				trace: 'verbose'
 			};
 			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
 
@@ -1104,7 +1112,9 @@ suite('Go Debug Adapter', function () {
 				request: 'launch',
 				mode: 'auto',
 				program: PROGRAM,
-				stopOnEntry: true
+				stopOnEntry: true,
+				logFile: logPath,
+				trace: 'verbose'
 			};
 			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
 
@@ -1128,7 +1138,9 @@ suite('Go Debug Adapter', function () {
 				request: 'launch',
 				mode: 'auto',
 				program: PROGRAM,
-				stopOnEntry: true
+				stopOnEntry: true,
+				logFile: logPath,
+				trace: 'verbose'
 			};
 			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
 
