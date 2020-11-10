@@ -313,8 +313,15 @@ suite('Go Debug Adapter', function () {
 
 	teardown(() => {
 		if (fs.existsSync(logPath)) {
-			const output = fs.readFileSync(logPath);
-			console.log(output.toString());
+			const data = fs.readFileSync(logPath, 'UTF-8');
+			// split the contents by new line
+			const lines = data.split(/\r?\n/);
+
+			// print all lines
+			lines.forEach((line) => {
+				console.log(line);
+			});
+
 			fs.unlinkSync(logPath);
 		}
 		return dc.stop();
