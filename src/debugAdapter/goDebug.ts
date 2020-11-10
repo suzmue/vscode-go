@@ -275,6 +275,7 @@ interface LaunchRequestArguments extends DebugProtocol.LaunchRequestArguments {
 	trace?: 'verbose' | 'log' | 'error';
 	backend?: string;
 	output?: string;
+	logFile?: string;
 	/** Delve LoadConfig parameters */
 	dlvLoadConfig?: LoadConfig;
 	dlvToolPath: string;
@@ -306,6 +307,7 @@ interface AttachRequestArguments extends DebugProtocol.AttachRequestArguments {
 	host?: string;
 	trace?: 'verbose' | 'log' | 'error';
 	backend?: string;
+	logFile?: string;
 	/** Delve LoadConfig parameters */
 	dlvLoadConfig?: LoadConfig;
 	dlvToolPath: string;
@@ -1757,7 +1759,11 @@ export class GoDebugSession extends LoggingDebugSession {
 					: Logger.LogLevel.Error;
 		const logPath =
 			this.logLevel !== Logger.LogLevel.Error ? path.join(os.tmpdir(), 'vscode-go-debug.txt') : undefined;
-		logger.setup(this.logLevel, logPath);
+		if (!!args.logFile) {
+			logger.setup(this.logLevel, args.logFile);
+		} else {
+			logger.setup(this.logLevel, logPath);
+		}
 
 		if (typeof args.showGlobalVariables === 'boolean') {
 			this.showGlobalVariables = args.showGlobalVariables;

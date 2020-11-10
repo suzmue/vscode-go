@@ -288,6 +288,7 @@ suite('Go Debug Adapter', function () {
 
 	const PROJECT_ROOT = path.normalize(path.join(__dirname, '..', '..', '..'));
 	const DATA_ROOT = path.join(PROJECT_ROOT, 'test', 'testdata');
+	const logPath = path.join(DATA_ROOT, 'vscode-debug.txt');
 
 	const remoteAttachConfig = {
 		name: 'Attach',
@@ -310,7 +311,14 @@ suite('Go Debug Adapter', function () {
 		return dc.start();
 	});
 
-	teardown(() => dc.stop());
+	teardown(() => {
+		if (fs.existsSync(logPath)) {
+			const output = fs.readFileSync(logPath);
+			console.log(output.toString());
+			fs.unlinkSync(logPath);
+		}
+		return dc.stop();
+	});
 
 	/**
 	 * This function sets up a server that returns helloworld on serverPort.
@@ -960,7 +968,9 @@ suite('Go Debug Adapter', function () {
 				request: 'launch',
 				mode: 'auto',
 				program: PROGRAM,
-				stopOnEntry: false
+				stopOnEntry: false,
+				logFile: logPath,
+				trace: 'verbose'
 			};
 			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
 
