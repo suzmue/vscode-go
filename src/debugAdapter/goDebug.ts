@@ -39,6 +39,7 @@ import {
 	getInferredGopath,
 } from '../utils/pathUtils';
 import { killProcessTree } from '../utils/processUtils';
+import { Mutex } from './mutex';
 
 const fsAccess = util.promisify(fs.access);
 const fsUnlink = util.promisify(fs.unlink);
@@ -791,6 +792,7 @@ export class Delve {
 }
 
 export class GoDebugSession extends LoggingDebugSession {
+	private disconnectMutex = new Mutex();
 	private variableHandles: Handles<DebugVariable>;
 	private breakpoints: Map<string, DebugBreakpoint[]>;
 	// Editing breakpoints requires halting delve, skip sending Stop Event to VS Code in such cases
@@ -812,6 +814,7 @@ export class GoDebugSession extends LoggingDebugSession {
 
 	private continueEpoch = 0;
 	private continueRequestRunning = false;
+
 	public constructor(
 		debuggerLinesStartAt1: boolean,
 		isServer: boolean = false,
@@ -874,21 +877,24 @@ export class GoDebugSession extends LoggingDebugSession {
 		response: DebugProtocol.DisconnectResponse,
 		args: DebugProtocol.DisconnectArguments
 	): Promise<void> {
-		log('DisconnectRequest');
-		if (this.delve) {
-			// Since users want to reset when they issue a disconnect request,
-			// we should have a timeout in case disconnectRequestHelper hangs.
-			await Promise.race([
-				this.disconnectRequestHelper(response, args),
-				new Promise((resolve) => setTimeout(() => {
-					log('DisconnectRequestHelper timed out after 5s.');
-					resolve();
-				}, 5_000))
-			]);
-		}
+		await this.disconnectMutex.dispatch(async () => {
+			log('DisconnectRequest');
 
-		this.shutdownProtocolServer(response, args);
-		log('DisconnectResponse');
+			if (this.delve) {
+				// Since users want to reset when they issue a disconnect request,
+				// we should have a timeout in case disconnectRequestHelper hangs.
+				await Promise.race([
+					this.disconnectRequestHelper(response, args),
+					new Promise((resolve) => setTimeout(() => {
+						log('DisconnectRequestHelper timed out after 5s.');
+						resolve();
+					}, 5_000))
+				]);
+			}
+
+			this.shutdownProtocolServer(response, args);
+			log('DisconnectResponse');
+		});
 	}
 
 	protected async disconnectRequestHelper(
