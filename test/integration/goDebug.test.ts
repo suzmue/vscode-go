@@ -278,7 +278,7 @@ suite('RemoteSourcesAndPackages Tests', () => {
 		assert.deepEqual(remoteSourcesAndPackages.remotePackagesBuildInfo, [helloPackage, testPackage]);
 	});
 });
-©
+
 // Test suite adapted from:
 // https://github.com/microsoft/vscode-mock-debug/blob/master/src/tests/adapter.test.ts
 suite('Go Debug Adapter', function () {
