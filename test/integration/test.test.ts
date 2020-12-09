@@ -96,7 +96,7 @@ suite('Test Go Test Args', () => {
 });
 
 suite('Test Go Test', function () {
-	this.timeout(10000);
+	this.timeout(20000);
 
 	const sourcePath = path.join(__dirname, '..', '..', '..', 'test', 'testdata', 'goTestTest');
 
