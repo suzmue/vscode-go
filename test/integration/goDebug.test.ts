@@ -368,7 +368,11 @@ suite('Go Debug Adapter', function () {
 
 		if (breakpoints.length) {
 			console.log(`Sending set breakpoints request for remote attach setup.`);
-			const breakpointsResult = await dc.setBreakpointsRequest({source: {path: breakpoints[0].path}, breakpoints});
+			const breakpointsResult = await dc.setBreakpointsRequest({
+				lines: [breakpoints[0].line],
+				source: {path: breakpoints[0].path},
+				breakpoints
+			});
 			assert.ok(breakpointsResult.success && breakpointsResult.body.breakpoints.length === breakpoints.length);
 			// Verify that there are no non-verified breakpoints.
 			breakpointsResult.body.breakpoints.forEach((breakpoint) => {
@@ -843,7 +847,7 @@ suite('Go Debug Adapter', function () {
 			const BREAKPOINT_LINE = 29;
 			const remoteProgram = await setUpRemoteProgram(remoteAttachConfig.port, server);
 
-			const breakpointLocation = getBreakpointLocation(FILE, BREAKPOINT_LINE, false);
+			const breakpointLocation = getBreakpointLocation(FILE, BREAKPOINT_LINE);
 
 			// Setup attach with a breakpoint.
 			await setUpRemoteAttach(remoteAttachDebugConfig, [breakpointLocation]);
@@ -868,7 +872,7 @@ suite('Go Debug Adapter', function () {
 			await setUpRemoteAttach(remoteAttachDebugConfig);
 
 			// Now sets a breakpoint.
-			const breakpointLocation = getBreakpointLocation(FILE, BREAKPOINT_LINE, false);
+			const breakpointLocation = getBreakpointLocation(FILE, BREAKPOINT_LINE);
 			const breakpointsResult = await dc.setBreakpointsRequest(
 				{source: {path: breakpointLocation.path}, breakpoints: [breakpointLocation]});
 			assert.ok(breakpointsResult.success && breakpointsResult.body.breakpoints[0].verified);
@@ -885,12 +889,11 @@ suite('Go Debug Adapter', function () {
 
 		test('stopped for a breakpoint set during initialization (remote attach)', async () => {
 			// BROKEN
-			
 			const FILE = path.join(DATA_ROOT, 'helloWorldServer', 'main.go');
 			const BREAKPOINT_LINE = 29;
 			const remoteProgram = await setUpRemoteProgram(remoteAttachConfig.port, server);
 
-			const breakpointLocation = getBreakpointLocation(FILE, BREAKPOINT_LINE, false);
+			const breakpointLocation = getBreakpointLocation(FILE, BREAKPOINT_LINE);
 
 			// Setup attach with a breakpoint.
 			await setUpRemoteAttach(remoteAttachDebugConfig, [breakpointLocation]);
