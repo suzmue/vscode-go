@@ -373,6 +373,7 @@ suite('Go Debug Adapter', function () {
 				source: {path: breakpoints[0].path},
 				breakpoints
 			});
+			console.log(`breakpoints result ${JSON.stringify(breakpointsResult)}`);
 			assert.ok(breakpointsResult.success && breakpointsResult.body.breakpoints.length === breakpoints.length);
 			// Verify that there are no non-verified breakpoints.
 			breakpointsResult.body.breakpoints.forEach((breakpoint) => {
