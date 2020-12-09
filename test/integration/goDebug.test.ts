@@ -839,9 +839,6 @@ suite('Go Debug Adapter', function () {
 
 		test('stopped for a breakpoint set during initialization (remote attach)', async () => {
 			// BROKEN
-			if (true) {
-				return;
-			}
 			const FILE = path.join(DATA_ROOT, 'helloWorldServer', 'main.go');
 			const BREAKPOINT_LINE = 29;
 			const remoteProgram = await setUpRemoteProgram(remoteAttachConfig.port, server);
@@ -863,9 +860,6 @@ suite('Go Debug Adapter', function () {
 
 		test('stopped for a breakpoint set after initialization (remote attach)', async () => {
 			// BROKEN
-			if (true) {
-				return;
-			}
 			const FILE = path.join(DATA_ROOT, 'helloWorldServer', 'main.go');
 			const BREAKPOINT_LINE = 29;
 			const remoteProgram = await setUpRemoteProgram(remoteAttachConfig.port, server);
@@ -891,9 +885,7 @@ suite('Go Debug Adapter', function () {
 
 		test('stopped for a breakpoint set during initialization (remote attach)', async () => {
 			// BROKEN
-			if (true) {
-				return;
-			}
+			
 			const FILE = path.join(DATA_ROOT, 'helloWorldServer', 'main.go');
 			const BREAKPOINT_LINE = 29;
 			const remoteProgram = await setUpRemoteProgram(remoteAttachConfig.port, server);
@@ -1260,7 +1252,7 @@ suite('Go Debug Adapter', function () {
 			};
 			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
 
-			await dc.hitBreakpoint(debugConfig, { path: FILE, line: BREAKPOINT_LINE } );
+			await dc.hitBreakpoint(debugConfig, getBreakpointLocation(FILE, BREAKPOINT_LINE));
 
 			return Promise.all([
 				dc.disconnectRequest({restart: false}),
