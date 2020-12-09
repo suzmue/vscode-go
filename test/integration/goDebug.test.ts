@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import { ChildProcess, spawn } from 'child_process';
+import { debug } from 'console';
 import * as fs from 'fs';
 import getPort = require('get-port');
 import * as http from 'http';
@@ -357,7 +358,7 @@ suite('Go Debug Adapter', function () {
 		// an initialized event.
 		await Promise.all([
 			new Promise(async (resolve) => {
-				console.log(`Setting up attach request for ${debugConfig}.`);
+				console.log(`Setting up attach request for ${JSON.stringify(debugConfig)}.`);
 				const attachResult = await dc.attachRequest(debugConfig as DebugProtocol.AttachRequestArguments);
 				assert.ok(attachResult.success);
 				resolve();
@@ -566,6 +567,181 @@ suite('Go Debug Adapter', function () {
 				dc.waitForEvent('terminated')
 			]);
 		});
+	});
+
+	suite('set current working directory', () => {
+		test('should debug program with cwd set', async () => {
+			const WD = path.join(DATA_ROOT, 'cwdTest');
+			const PROGRAM = path.join(WD, 'cwdTest');
+			const FILE = path.join(PROGRAM, 'main.go');
+			const BREAKPOINT_LINE = 11;
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				cwd: WD,
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await dc.hitBreakpoint(debugConfig, getBreakpointLocation(FILE, BREAKPOINT_LINE));
+
+			await assertVariableValue('strdat', '"Hello, World!"');
+		});
+
+		test('should debug program without cwd set', async () => {
+			const WD = path.join(DATA_ROOT, 'cwdTest');
+			const PROGRAM = path.join(WD, 'cwdTest');
+			const FILE = path.join(PROGRAM, 'main.go');
+			const BREAKPOINT_LINE = 11;
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await dc.hitBreakpoint(debugConfig, getBreakpointLocation(FILE, BREAKPOINT_LINE));
+
+			await assertVariableValue('strdat', '"Goodbye, World."');
+		});
+
+		test('should debug file program with cwd set', async () => {
+			const WD = path.join(DATA_ROOT, 'cwdTest');
+			const PROGRAM = path.join(WD, 'cwdTest', 'main.go');
+			const FILE = PROGRAM;
+			const BREAKPOINT_LINE = 11;
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				cwd: WD,
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await dc.hitBreakpoint(debugConfig, getBreakpointLocation(FILE, BREAKPOINT_LINE));
+
+			await assertVariableValue('strdat', '"Hello, World!"');
+		});
+
+		test('should debug file program without cwd set', async () => {
+			const WD = path.join(DATA_ROOT, 'cwdTest');
+			const PROGRAM = path.join(WD, 'cwdTest', 'main.go');
+			const FILE = PROGRAM;
+			const BREAKPOINT_LINE = 11;
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await dc.hitBreakpoint(debugConfig, getBreakpointLocation(FILE, BREAKPOINT_LINE));
+
+			await assertVariableValue('strdat', '"Goodbye, World."');
+		});
+
+		test('should run program with cwd set (noDebug)', () => {
+			const WD = path.join(DATA_ROOT, 'cwdTest');
+			const PROGRAM = path.join(WD, 'cwdTest');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				cwd: WD,
+				noDebug: true
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			return Promise.all([
+				dc.launch(debugConfig),
+				dc.waitForEvent('output').then((event) => {
+					assert.strictEqual(event.body.output, 'Hello, World!\n');
+				})
+			]);
+		});
+
+		test('should run program without cwd set (noDebug)', () => {
+			const WD = path.join(DATA_ROOT, 'cwdTest');
+			const PROGRAM = path.join(WD, 'cwdTest');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				noDebug: true
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			return Promise.all([
+				dc.launch(debugConfig),
+				dc.waitForEvent('output').then((event) => {
+					assert.strictEqual(event.body.output, 'Goodbye, World.\n');
+				})
+			]);
+		});
+
+		test('should run file program with cwd set (noDebug)', () => {
+			const WD = path.join(DATA_ROOT, 'cwdTest');
+			const PROGRAM = path.join(WD, 'cwdTest', 'main.go');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				cwd: WD,
+				noDebug: true
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			return Promise.all([
+				dc.launch(debugConfig),
+				dc.waitForEvent('output').then((event) => {
+					assert.strictEqual(event.body.output, 'Hello, World!\n');
+				})
+			]);
+		});
+
+		test('should run file program without cwd set (noDebug)', () => {
+			const WD = path.join(DATA_ROOT, 'cwdTest');
+			const PROGRAM = path.join(WD, 'cwdTest', 'main.go');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				noDebug: true
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			return Promise.all([
+				dc.launch(debugConfig),
+				dc.waitForEvent('output').then((event) => {
+					assert.strictEqual(event.body.output, 'Goodbye, World.\n');
+				})
+			]);
+		});
+
 	});
 
 	suite('remote attach', () => {
@@ -889,6 +1065,10 @@ suite('Go Debug Adapter', function () {
 	});
 
 	suite('disconnect', () => {
+		// The teardown code for the Go Debug Adapter test suite issues a disconnectRequest.
+		// In order for these tests to pass, the debug adapter must not fail if a
+		// disconnectRequest is sent after it has already disconnected.
+
 		test('disconnect should work for remote attach', async () => {
 			this.timeout(30_000);
 			const server = await getPort();
@@ -921,6 +1101,209 @@ suite('Go Debug Adapter', function () {
 			assert.strictEqual(response, secondResponse);
 			await killProcessTree(remoteProgram);
 			await new Promise((resolve) => setTimeout(resolve, 2_000));
+		});
+
+		test('should disconnect while continuing on entry', async () => {
+			const PROGRAM = path.join(DATA_ROOT, 'loop');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				stopOnEntry: false
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await Promise.all([
+				dc.configurationSequence(),
+				dc.launch(debugConfig)
+			]);
+
+			return Promise.all([
+				dc.disconnectRequest({restart: false}),
+				dc.waitForEvent('terminated')
+			]);
+		});
+
+		test('should disconnect with multiple disconnectRequests', async () => {
+			const PROGRAM = path.join(DATA_ROOT, 'loop');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				stopOnEntry: false
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await Promise.all([
+				dc.configurationSequence(),
+				dc.launch(debugConfig)
+			]);
+
+			await Promise.all([
+				dc.disconnectRequest({restart: false}).then(() =>
+					dc.disconnectRequest({restart: false})
+				),
+				dc.waitForEvent('terminated')
+			]);
+		});
+
+		test('should disconnect after continue', async () => {
+			const PROGRAM = path.join(DATA_ROOT, 'loop');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				stopOnEntry: true
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await Promise.all([
+				dc.configurationSequence(),
+				dc.launch(debugConfig)
+			]);
+
+			const continueResponse = await dc.continueRequest({ threadId: 1 });
+			assert.ok(continueResponse.success);
+
+			return Promise.all([
+				dc.disconnectRequest({restart: false}),
+				dc.waitForEvent('terminated')
+			]);
+		});
+
+		test('should disconnect while nexting', async () => {
+			const PROGRAM = path.join(DATA_ROOT, 'sleep');
+			const FILE = path.join(DATA_ROOT, 'sleep', 'sleep.go');
+			const BREAKPOINT_LINE = 11;
+			const location = getBreakpointLocation(FILE, BREAKPOINT_LINE);
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				stopOnEntry: false
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await dc.hitBreakpoint(debugConfig, location);
+
+			const nextResponse = await dc.nextRequest({ threadId: 1 });
+			assert.ok(nextResponse.success);
+
+			return Promise.all([
+				dc.disconnectRequest({restart: false}),
+				dc.waitForEvent('terminated')
+			]);
+		});
+
+		test('should disconnect while paused on pause', async () => {
+			const PROGRAM = path.join(DATA_ROOT, 'loop');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await Promise.all([
+				dc.configurationSequence(),
+				dc.launch(debugConfig)
+			]);
+
+			const pauseResponse = await dc.pauseRequest({threadId: 1});
+			assert.ok(pauseResponse.success);
+
+			return Promise.all([
+				dc.disconnectRequest({restart: false}),
+				dc.waitForEvent('terminated'),
+			]);
+		});
+
+		test('should disconnect while paused on breakpoint', async () => {
+			const PROGRAM = path.join(DATA_ROOT, 'loop');
+			const FILE = path.join(PROGRAM, 'loop.go');
+			const BREAKPOINT_LINE = 5;
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await dc.hitBreakpoint(debugConfig, { path: FILE, line: BREAKPOINT_LINE } );
+
+			return Promise.all([
+				dc.disconnectRequest({restart: false}),
+				dc.waitForEvent('terminated')
+			]);
+		});
+
+		test('should disconnect while paused on entry', async () => {
+			const PROGRAM = path.join(DATA_ROOT, 'loop');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				stopOnEntry: true
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await Promise.all([
+				dc.configurationSequence(),
+				dc.launch(debugConfig)
+			]);
+
+			return Promise.all([
+				dc.disconnectRequest({restart: false}),
+				dc.waitForEvent('terminated')
+			]);
+		});
+
+		test('should disconnect while paused on next', async () => {
+			const PROGRAM = path.join(DATA_ROOT, 'loop');
+
+			const config = {
+				name: 'Launch',
+				type: 'go',
+				request: 'launch',
+				mode: 'auto',
+				program: PROGRAM,
+				stopOnEntry: true
+			};
+			const debugConfig = debugConfigProvider.resolveDebugConfiguration(undefined, config);
+
+			await Promise.all([
+				dc.configurationSequence(),
+				dc.launch(debugConfig)
+			]);
+
+			const nextResponse = await dc.nextRequest({ threadId: 1 });
+			assert.ok(nextResponse.success);
+
+			return Promise.all([
+				dc.disconnectRequest({restart: false}),
+				dc.waitForEvent('terminated')
+			]);
 		});
 	});
 });

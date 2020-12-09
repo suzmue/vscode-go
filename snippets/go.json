@@ -67,7 +67,7 @@
 		},
 		"for range statement": {
 			"prefix": "forr",
-			"body": "for ${1:_, }${2:var} := range ${3:var} {\n\t$0\n}",
+			"body": "for ${1:_, }${2:v} := range ${3:v} {\n\t$0\n}",
 			"description": "Snippet for a for range loop"
 		},
 		"channel declaration": {
@@ -214,6 +214,11 @@
 			"prefix": "tf",
 			"body": "func Test$1(t *testing.T) {\n\t$0\n}",
 			"description": "Snippet for Test function"
+		},
+		"test main": {
+			"prefix": "tm",
+			"body": "func TestMain(m *testing.M) {\n\t$1\n\n\tos.Exit(m.Run())\n}",
+			"description": "Snippet for TestMain function"
 		},
 		"benchmark function": {
 			"prefix": "bf",

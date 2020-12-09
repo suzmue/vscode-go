@@ -91,10 +91,6 @@ let defaultLanguageProviders: vscode.Disposable[] = [];
 // server.
 let restartCommand: vscode.Disposable;
 
-// When enabled, users may be prompted to fill out the gopls survey.
-// For now, we turn it on in the Nightly extension to test it.
-const goplsSurveyOn: boolean = isNightly();
-
 // lastUserAction is the time of the last user-triggered change.
 // A user-triggered change is a didOpen, didChange, didSave, or didClose event.
 let lastUserAction: Date = new Date();
@@ -147,7 +143,7 @@ function scheduleGoplsSuggestions(tool: Tool) {
 		setTimeout(survey, timeDay);
 
 		const cfg = buildLanguageServerConfig(getGoConfig());
-		if (!goplsSurveyOn || !cfg.enabled) {
+		if (!cfg.enabled) {
 			return;
 		}
 		maybePromptForGoplsSurvey();
@@ -215,25 +211,26 @@ export interface BuildLanguageClientOption extends LanguageServerConfig {
 // used in building a new LanguageClient instance. Options specified
 // in LanguageServerConfig
 function buildLanguageClientOption(cfg: LanguageServerConfig): BuildLanguageClientOption {
-		// Reuse the same output channel for each instance of the server.
-		if (cfg.enabled) {
-			if (!serverOutputChannel) {
-				serverOutputChannel = vscode.window.createOutputChannel(cfg.serverName + ' (server)');
-			}
-			if (!serverTraceChannel) {
-				serverTraceChannel = vscode.window.createOutputChannel(cfg.serverName);
-			}
+	// Reuse the same output channel for each instance of the server.
+	if (cfg.enabled) {
+		if (!serverOutputChannel) {
+			serverOutputChannel = vscode.window.createOutputChannel(cfg.serverName + ' (server)');
 		}
-		return Object.assign({
-			outputChannel: serverOutputChannel,
-			traceOutputChannel: serverTraceChannel
-		}, cfg);
+		if (!serverTraceChannel) {
+			serverTraceChannel = vscode.window.createOutputChannel(cfg.serverName);
+		}
+	}
+	return Object.assign({
+		outputChannel: serverOutputChannel,
+		traceOutputChannel: serverTraceChannel
+	}, cfg);
 }
 
 // buildLanguageClient returns a language client built using the given language server config.
 // The returned language client need to be started before use.
 export async function buildLanguageClient(cfg: BuildLanguageClientOption): Promise<LanguageClient> {
-	let goplsWorkspaceConfig = getGoplsConfig();
+	let goplsWorkspaceConfig = getGoplsConfig() as any;
+	goplsWorkspaceConfig = filterDefaultConfigValues(goplsWorkspaceConfig, 'gopls', undefined);
 	goplsWorkspaceConfig = await adjustGoplsWorkspaceConfiguration(cfg, goplsWorkspaceConfig);
 	const c = new LanguageClient(
 		'go',  // id
@@ -245,7 +242,19 @@ export async function buildLanguageClient(cfg: BuildLanguageClientOption): Promi
 		},
 		{
 			initializationOptions: goplsWorkspaceConfig,
-			documentSelector: ['go', 'go.mod', 'go.sum'],
+			documentSelector: [
+				// Filter out unsupported document types, e.g. vsls, git.
+				// https://docs.microsoft.com/en-us/visualstudio/liveshare/reference/extensions#visual-studio-code-1
+				//
+				// - files
+				{ language: 'go', scheme: 'file' },
+				{ language: 'go.mod', scheme: 'file' },
+				{ language: 'go.sum', scheme: 'file' },
+				// - unsaved files
+				{ language: 'go', scheme: 'untitled' },
+				{ language: 'go.mod', scheme: 'untitled' },
+				{ language: 'go.sum', scheme: 'untitled' },
+			],
 			uriConverters: {
 				// Apply file:/// scheme to all file paths.
 				code2Protocol: (uri: vscode.Uri): string =>
@@ -425,19 +434,65 @@ export async function buildLanguageClient(cfg: BuildLanguageClientOption): Promi
 				workspace: {
 					configuration: async (params: ConfigurationParams, token: CancellationToken, next: ConfigurationRequest.HandlerSignature): Promise<any[] | ResponseError<void>> => {
 						const configs = await next(params, token);
-						if (!Array.isArray(configs)) {
+						if (!configs || !Array.isArray(configs)) {
 							return configs;
 						}
-						for (let workspaceConfig of configs) {
-							workspaceConfig = await adjustGoplsWorkspaceConfiguration(cfg, workspaceConfig);
+						const ret = [] as any[];
+						for (let i = 0; i < configs.length; i++) {
+							let workspaceConfig = configs[i];
+							if (!!workspaceConfig && typeof workspaceConfig === 'object') {
+								const scopeUri = params.items[i].scopeUri;
+								const resource = scopeUri ? vscode.Uri.parse(scopeUri) : undefined;
+								const section = params.items[i].section;
+								workspaceConfig = filterDefaultConfigValues(workspaceConfig, section, resource);
+								workspaceConfig = await adjustGoplsWorkspaceConfiguration(cfg, workspaceConfig);
+							}
+							ret.push(workspaceConfig);
 						}
-						return configs;
+						return ret;
 					},
 				},
 			}
 		}
 	);
 	return c;
+}
+
+// filterDefaultConfigValues removes the entries filled based on the default values
+// and selects only those the user explicitly specifies in their settings.
+// This assumes workspaceConfig is a non-null(undefined) object type.
+// Exported for testing.
+export function filterDefaultConfigValues(workspaceConfig: any, section: string, resource: vscode.Uri): any {
+	if (!workspaceConfig) {
+		return workspaceConfig;
+	}
+
+	const dot = section?.lastIndexOf('.') || -1;
+	const sectionKey = dot >= 0 ? section.substr(0, dot) : section;  // e.g. 'gopls'
+
+	const cfg = vscode.workspace.getConfiguration(sectionKey, resource);
+	const filtered = {} as { [key: string]: any };
+	for (const [key, value] of Object.entries(workspaceConfig)) {
+		if (typeof value === 'function') {
+			continue;
+		}
+		const c = cfg.inspect(key);
+		// select only the field whose current value comes from non-default setting.
+		if (!c || !deepEqual(c.defaultValue, value) ||
+			// c.defaultValue !== value would be most likely sufficient, except
+			// when gopls' default becomes different from extension's default.
+			// So, we also forward the key if ever explicitely stated in one of the
+			// settings layers.
+			c.globalLanguageValue !== undefined ||
+			c.globalValue !== undefined ||
+			c.workspaceFolderLanguageValue !== undefined ||
+			c.workspaceFolderValue !== undefined ||
+			c.workspaceLanguageValue !== undefined ||
+			c.workspaceValue !== undefined) {
+			filtered[key] = value;
+		}
+	}
+	return filtered;
 }
 
 // adjustGoplsWorkspaceConfiguration adds any extra options to the gopls
@@ -811,6 +866,9 @@ export const getLatestGoplsVersion = async (tool: Tool) => {
 //
 // If this command has already been executed, it returns the saved result.
 export const getLocalGoplsVersion = async (cfg: LanguageServerConfig) => {
+	if (!cfg) {
+		return null;
+	}
 	if (cfg.version !== '') {
 		return cfg.version;
 	}
@@ -986,9 +1044,7 @@ export function shouldPromptForGoplsSurvey(now: Date, cfg: SurveyConfig): Survey
 		// The extension has been activated this month, so we should have already
 		// decided if the user should be prompted.
 		if (daysBetween(now, cfg.dateComputedPromptThisMonth) < 30) {
-			if (cfg.dateToPromptThisMonth) {
-				return cfg;
-			}
+			return cfg;
 		}
 	}
 	// This is the first activation this month (or ever), so decide if we
@@ -1032,8 +1088,8 @@ Would you be willing to fill out a quick survey about your experience with gopls
 		case 'Yes':
 			cfg.lastDateAccepted = now;
 			cfg.prompt = true;
-
-			await vscode.env.openExternal(vscode.Uri.parse(`https://google.qualtrics.com/jfe/form/SV_ekAdHVcVcvKUojX`));
+			const usersGoplsVersion = await getLocalGoplsVersion(latestConfig);
+			await vscode.env.openExternal(vscode.Uri.parse(`https://google.qualtrics.com/jfe/form/SV_ekAdHVcVcvKUojX?gopls=${usersGoplsVersion}&extid=${extensionId}`));
 			break;
 		case 'Not now':
 			cfg.prompt = true;
@@ -1057,8 +1113,8 @@ Would you be willing to fill out a quick survey about your experience with gopls
 
 export const goplsSurveyConfig = 'goplsSurveyConfig';
 
-function getSurveyConfig(): SurveyConfig {
-	const saved = getFromGlobalState(goplsSurveyConfig);
+function getSurveyConfig(surveyConfigKey = goplsSurveyConfig): SurveyConfig {
+	const saved = getFromGlobalState(surveyConfigKey);
 	if (saved === undefined) {
 		return {};
 	}
@@ -1070,7 +1126,7 @@ function getSurveyConfig(): SurveyConfig {
 			}
 			return value;
 		});
-		return cfg;
+		return cfg || {};
 	} catch (err) {
 		console.log(`Error parsing JSON from ${saved}: ${err}`);
 		return {};
@@ -1082,9 +1138,12 @@ export async function showSurveyConfig() {
 	outputChannel.appendLine(JSON.stringify(getSurveyConfig(), null, 2));
 	outputChannel.show();
 
-	const selected = await vscode.window.showInformationMessage(`Maybe prompt for survey?`, 'Yes', 'No');
+	const selected = await vscode.window.showInformationMessage(`Prompt for survey?`, 'Yes', 'Maybe', 'No');
 	switch (selected) {
 		case 'Yes':
+			promptForSurvey(getSurveyConfig(), new Date());
+			break;
+		case 'Maybe':
 			maybePromptForGoplsSurvey();
 			break;
 		default:
@@ -1116,6 +1175,17 @@ async function suggestGoplsIssueReport(msg: string, reason: errorKind) {
 	// Don't prompt users who manually restart to file issues until gopls/v1.0.
 	if (reason === errorKind.manualRestart) {
 		return;
+	}
+
+	// The user may have an outdated version of gopls, in which case we should
+	// just prompt them to update, not file an issue.
+	const tool = getTool('gopls');
+	if (tool) {
+		const versionToUpdate = await shouldUpdateLanguageServer(tool, latestConfig);
+		if (versionToUpdate) {
+			promptForUpdatingTool(tool.name, versionToUpdate, true);
+			return;
+		}
 	}
 
 	// Show the user the output channel content to alert them to the issue.
@@ -1155,24 +1225,28 @@ You will be asked to provide additional information and logs, so PLEASE READ THE
 					errKind = 'initialization';
 					break;
 			}
+			// Get the user's version in case the update prompt above failed.
 			const usersGoplsVersion = await getLocalGoplsVersion(latestConfig);
-			// TODO(hakim): If gopls version is too old, ask users to update it.
+			const extInfo = getExtensionInfo();
 			const settings = latestConfig.flags.join(' ');
 			const title = `gopls: automated issue report (${errKind})`;
-			const sanitizedLog = collectGoplsLog();
+			const { sanitizedLog, failureReason } = await collectGoplsLog();
 			const goplsLog = (sanitizedLog) ?
 				`<pre>${sanitizedLog}</pre>` :
-				`
-Please attach the stack trace from the crash.
+				`Please attach the stack trace from the crash.
 A window with the error message should have popped up in the lower half of your screen.
 Please copy the stack trace and error messages from that window and paste it in this issue.
 
 <PASTE STACK TRACE HERE>
+
+Failed to auto-collect gopls trace: ${failureReason}.
 `;
 
 			const body = `
 gopls version: ${usersGoplsVersion}
 gopls flags: ${settings}
+extension version: ${extInfo.version}
+environment: ${extInfo.appName}
 
 ATTENTION: PLEASE PROVIDE THE DETAILS REQUESTED BELOW.
 
@@ -1248,7 +1322,7 @@ export function showServerOutputChannel() {
 			}
 			found = doc;
 			// .log, as some decoration is better than none
-			vscode.workspace.openTextDocument({language: 'log', content: contents});
+			vscode.workspace.openTextDocument({ language: 'log', content: contents });
 		}
 	}
 	if (found === undefined) {
@@ -1256,35 +1330,48 @@ export function showServerOutputChannel() {
 	}
 }
 
-function collectGoplsLog(): string {
+function sleep(ms: number) {
+	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function collectGoplsLog(): Promise<{ sanitizedLog?: string; failureReason?: string; }> {
 	serverOutputChannel.show();
 	// Find the logs in the output channel. There is no way to read
 	// an output channel directly, but we can find the open text
 	// document, since we just surfaced the output channel to the user.
 	// See https://github.com/microsoft/vscode/issues/65108.
 	let logs: string;
-	for (const doc of vscode.workspace.textDocuments) {
-		if (doc.languageId !== 'Log') {
-			continue;
+	for (let i = 0; i < 3; i++) {
+		// try a couple of times until successfully finding the channel.
+		for (const doc of vscode.workspace.textDocuments) {
+			if (doc.languageId !== 'Log') {
+				continue;
+			}
+			if (doc.isDirty || doc.isClosed) {
+				continue;
+			}
+			// The document's name should look like 'extension-output-#X'.
+			if (doc.fileName.indexOf('extension-output-') === -1) {
+				continue;
+			}
+			logs = doc.getText();
+			break;
 		}
-		if (doc.isDirty || doc.isClosed) {
-			continue;
+		if (!!logs) {
+			break;
 		}
-		// The document's name should look like 'extension-output-#X'.
-		if (doc.fileName.indexOf('extension-output-') === -1) {
-			continue;
-		}
-		logs = doc.getText();
-		break;
+		// sleep a bit before the next try. The choice of the sleep time is arbitrary.
+		await sleep((i + 1) * 10);
 	}
+
 	return sanitizeGoplsTrace(logs);
 }
 
 // capture only panic stack trace and the initialization error message.
 // exported for testing.
-export function sanitizeGoplsTrace(logs?: string): string {
+export function sanitizeGoplsTrace(logs?: string): { sanitizedLog?: string, failureReason?: string } {
 	if (!logs) {
-		return '';
+		return { failureReason: 'no gopls log' };
 	}
 	const panicMsgBegin = logs.lastIndexOf('panic: ');
 	if (panicMsgBegin > -1) {  // panic message was found.
@@ -1307,29 +1394,39 @@ export function sanitizeGoplsTrace(logs?: string): string {
 				}
 			).join('\n');
 
-			return sanitized;
+			if (sanitized) {
+				return { sanitizedLog: sanitized };
+			}
+			return { failureReason: 'empty panic trace' };
 		}
+		return { failureReason: 'incomplete panic trace' };
 	}
 	const initFailMsgBegin = logs.lastIndexOf('Starting client failed');
 	if (initFailMsgBegin > -1) {  // client start failed. Capture up to the 'Code:' line.
 		const initFailMsgEnd = logs.indexOf('Code: ', initFailMsgBegin);
 		if (initFailMsgEnd > -1) {
 			const lineEnd = logs.indexOf('\n', initFailMsgEnd);
-			return lineEnd > -1 ? logs.substr(initFailMsgBegin, lineEnd - initFailMsgBegin) : logs.substr(initFailMsgBegin);
+			return { sanitizedLog: lineEnd > -1 ? logs.substr(initFailMsgBegin, lineEnd - initFailMsgBegin) : logs.substr(initFailMsgBegin) };
 		}
 	}
-	return '';
+	if (logs.lastIndexOf('Usage: gopls') > -1) {
+		return { failureReason: 'incorrect gopls command usage' };
+	}
+	return { failureReason: 'unrecognized crash pattern' };
 }
 
 export async function promptForLanguageServerDefaultChange(cfg: vscode.WorkspaceConfiguration) {
+	const useLanguageServer = cfg.inspect<boolean>('useLanguageServer');
+	if (useLanguageServer.globalValue !== undefined || useLanguageServer.workspaceValue !== undefined) {
+		if (!cfg['useLanguageServer']) {  // ask users who explicitly disabled.
+			promptForLanguageServerOptOutSurvey();
+		}
+		return;  // user already explicitly set the field.
+	}
+
 	const promptedForLSDefaultChangeKey = `promptedForLSDefaultChange`;
 	if (getFromGlobalState(promptedForLSDefaultChangeKey, false)) {
 		return;
-	}
-
-	const useLanguageServer = cfg.inspect<boolean>('useLanguageServer');
-	if (useLanguageServer.globalValue !== undefined || useLanguageServer.workspaceValue !== undefined) {
-		return;  // user already explicitly set the field.
 	}
 
 	const selected = await vscode.window.showInformationMessage(
@@ -1341,4 +1438,48 @@ export async function promptForLanguageServerDefaultChange(cfg: vscode.Workspace
 		default:
 	}
 	updateGlobalState(promptedForLSDefaultChangeKey, true);
+}
+
+// Prompt users who disabled the language server and ask to file an issue.
+async function promptForLanguageServerOptOutSurvey() {
+	const promptedForLSOptOutSurveyKey = `promptedForLSOptOutSurvey`;
+	const value = getSurveyConfig(promptedForLSOptOutSurveyKey);  // We use only 'prompt' and 'lastDatePrompted' fields.
+
+	if (value?.prompt === false ||
+		(value?.lastDatePrompted && daysBetween(value.lastDatePrompted, new Date()) < 90)) {
+		return;
+	}
+
+	value.lastDatePrompted = new Date();
+
+	const selected = await vscode.window.showInformationMessage(
+		`Looks like you've disabled the language server. Would you be willing to file an issue and tell us why you had to disable it?`,
+		'Yes', 'Not now', 'Never');
+	switch (selected) {
+		case 'Yes':
+			const title = 'gopls: automated issue report (opt out)';
+			const body = `
+Please tell us why you had to disable the language server.
+
+`;
+			const url = `https://github.com/golang/vscode-go/issues/new?title=${title}&labels=upstream-tools&body=${body}`;
+			await vscode.env.openExternal(vscode.Uri.parse(url));
+			break;
+		case 'Never':
+			value.prompt = false;
+			break;
+		default:
+	}
+	updateGlobalState(promptedForLSOptOutSurveyKey, JSON.stringify(value));
+}
+
+interface ExtensionInfo {
+	version: string;  // Extension version
+	appName: string;  // The application name of the editor, like 'VS Code'
+}
+
+function getExtensionInfo(): ExtensionInfo {
+	const version = vscode.extensions.getExtension(extensionId)?.packageJSON?.version;
+	const appName = vscode.env.appName;
+	return { version, appName };
 }

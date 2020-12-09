@@ -198,7 +198,7 @@ export async function installTool(
 		const writeFile = util.promisify(fs.writeFile);
 		await writeFile(tmpGoModFile, 'module tools');
 	} else {
-		envForTools['GO111MODULE'] = 'off';
+		env['GO111MODULE'] = 'off';
 	}
 	// Some users use direnv-like setup where the choice of go is affected by
 	// the current directory path. In order to avoid choosing a different go,
@@ -225,9 +225,7 @@ export async function installTool(
 	}
 	args.push(importPath);
 
-	const toolImportPath = tool.version ? importPath + '@' + tool.version : importPath;
-
-	let output: string;
+	let output: string = 'no output';
 	let result: string = '';
 	try {
 		const opts = {
@@ -239,23 +237,21 @@ export async function installTool(
 		output = `${stdout} ${stderr}`;
 		logVerbose(`install: %s %s\n%s%s`, goBinary, args.join(' '), stdout, stderr);
 
-		// TODO(rstambler): Figure out why this happens and maybe delete it.
-		if (stderr.indexOf('unexpected directory layout:') > -1) {
-			await execFile(goVersion.binaryPath, args, opts);
-		} else if (hasModSuffix(tool)) {
-			const gopath = env['GOPATH'];
+		if (hasModSuffix(tool)) {  // Actual installation of the -gomod tool is done by running go build.
+			const gopath = env['GOBIN'] ?? env['GOPATH'];
 			if (!gopath) {
-				return `GOPATH not configured in environment`;
+				return `GOBIN/GOPATH not configured in environment`;
 			}
 			const destDir = gopath.split(path.delimiter)[0];
 			const outputFile = path.join(destDir, 'bin', process.platform === 'win32' ? `${tool.name}.exe` : tool.name);
-			await execFile(goVersion.binaryPath, ['build', '-o', outputFile, importPath], opts);
+			await execFile(goBinary, ['build', '-o', outputFile, importPath], opts);
 		}
 		const toolInstallPath = getBinPath(tool.name);
-		outputChannel.appendLine(`Installing ${toolImportPath} (${toolInstallPath}) SUCCEEDED`);
+		outputChannel.appendLine(`Installing ${importPath} (${toolInstallPath}) SUCCEEDED`);
 	} catch (e) {
-		outputChannel.appendLine(`Installing ${toolImportPath} FAILED`);
-		result = `failed to install ${tool.name}(${toolImportPath}): ${e} ${output} `;
+		outputChannel.appendLine(`Installing ${importPath} FAILED`);
+		outputChannel.appendLine(`${JSON.stringify(e, null, 1)}`);
+		result = `failed to install ${tool.name}(${importPath}): ${e} ${output}`;
 	}
 
 	// Delete the temporary installation directory.
@@ -315,7 +311,7 @@ Run "go get -v ${getImportPath(tool, goVersion)}" to install.`;
 	}
 }
 
-export async function promptForUpdatingTool(toolName: string, newVersion?: SemVer) {
+export async function promptForUpdatingTool(toolName: string, newVersion?: SemVer, crashed?: boolean) {
 	const tool = getTool(toolName);
 	const toolVersion = { ...tool, version: newVersion }; // ToolWithVersion
 
@@ -323,14 +319,20 @@ export async function promptForUpdatingTool(toolName: string, newVersion?: SemVe
 	if (containsTool(declinedUpdates, tool)) {
 		return;
 	}
-	const goVersion = await getGoVersion();
-	let updateMsg = `Your version of ${tool.name} appears to be out of date. Please update for an improved experience.`;
+
+	// Adjust the prompt if it occurred because the tool crashed.
+	let updateMsg: string;
+	if (crashed === true) {
+		updateMsg = `${tool.name} has crashed, but you are using an outdated version. Please update to the latest version of ${tool.name}.`;
+	} else if (newVersion) {
+		updateMsg = `A new version of ${tool.name} (v${newVersion}) is available. Please update for an improved experience.`;
+	} else {
+		updateMsg = `Your version of ${tool.name} appears to be out of date. Please update for an improved experience.`;
+	}
+
 	let choices: string[] = ['Update'];
 	if (toolName === `gopls`) {
 		choices.push('Release Notes');
-	}
-	if (newVersion) {
-		updateMsg = `A new version of ${tool.name} (v${newVersion}) is available. Please update for an improved experience.`;
 	}
 
 	while (choices.length > 0) {
@@ -338,6 +340,7 @@ export async function promptForUpdatingTool(toolName: string, newVersion?: SemVe
 		switch (selected) {
 			case 'Update':
 				choices = [];
+				const goVersion = await getGoVersion();
 				await installTools([toolVersion], goVersion);
 				break;
 			case 'Release Notes':
@@ -509,18 +512,15 @@ function getMissingTools(goVersion: GoVersion): Promise<Tool[]> {
 let suggestedDownloadGo = false;
 
 async function suggestDownloadGo() {
+	const msg = `Failed to find the "go" binary in either GOROOT(${getCurrentGoRoot()}) or PATH(${envPath}).` +
+			`Check PATH, or Install Go and reload the window. ` +
+			`If PATH isn't what you expected, see https://github.com/golang/vscode-go/issues/971`;
 	if (suggestedDownloadGo) {
-		vscode.window.showErrorMessage(
-			`Failed to find the "go" binary in either GOROOT(${getCurrentGoRoot()}) or PATH(${envPath}).`
-		);
+		vscode.window.showErrorMessage(msg);
 		return;
 	}
 
-	const choice = await vscode.window.showErrorMessage(
-		`Failed to find the "go" binary in either GOROOT(${getCurrentGoRoot()}) or PATH(${envPath}). ` +
-		`Check PATH, or Install Go and reload the window.`,
-		'Go to Download Page'
-	);
+	const choice = await vscode.window.showErrorMessage(msg, 'Go to Download Page');
 	if (choice === 'Go to Download Page') {
 		vscode.env.openExternal(vscode.Uri.parse('https://golang.org/dl/'));
 	}
