@@ -305,7 +305,7 @@ suite('Go Debug Adapter', function () {
 		dc = new DebugClient('node', path.join(PROJECT_ROOT, DEBUG_ADAPTER), 'go');
 
 		// Launching delve may take longer than the default timeout of 5000.
-		dc.defaultTimeout = 20_000;
+		dc.defaultTimeout = 40_000;
 
 		// To connect to a running debug server for debugging the tests, specify PORT.
 		return dc.start();
