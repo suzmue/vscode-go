@@ -771,6 +771,7 @@ It returns the number of bytes written and any write error encountered.
 	});
 
 	test('Workspace Symbols', () => {
+		this.timeout(20000);
 		const workspacePath = path.join(fixturePath, 'vendoring');
 		const configWithoutIgnoringFolders = Object.create(vscode.workspace.getConfiguration('go'), {
 			gotoSymbol: {

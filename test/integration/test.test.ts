@@ -169,18 +169,23 @@ suite('Test Go Test', function () {
 		await runTest(
 			{ isMod: true, includeSubDirectories: true },
 			[path.join(repoPath, 'a_test.go'), path.join(repoPath, 'b', 'b_test.go')]);
+		console.log('test 1');
 		await runTest(
 			{ isMod: true, includeSubDirectories: false },
 			[path.join(repoPath, 'a_test.go')]);
+		console.log('test 2');
 		await runTest(
 			{ isMod: true, includeSubDirectories: true, testFlags: ['-v'] },
 			[path.join(repoPath, 'a_test.go'), path.join(repoPath, 'b', 'b_test.go')]);
+		console.log('test 3');
 		await runTest(
 			{ isMod: true, includeSubDirectories: true, testFlags: ['-race'], applyCodeCoverage: true },
 			[path.join(repoPath, 'a_test.go'), path.join(repoPath, 'b', 'b_test.go')]);
+		console.log('test 4');
 		await runTest(
 			{ isMod: true, includeSubDirectories: false, testFlags: ['-v'] },
 			[path.join(repoPath, 'a_test.go')]);
+		console.log('test 5');
 	});
 
 	test('resolves file names in logs (GOPATH)', async () => {
