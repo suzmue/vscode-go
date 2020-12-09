@@ -858,7 +858,6 @@ suite('Go Debug Adapter', function () {
 		});
 
 		test('stopped for a breakpoint set after initialization (remote attach)', async () => {
-			this.timeout(30_000);
 			const FILE = path.join(DATA_ROOT, 'helloWorldServer', 'main.go');
 			const BREAKPOINT_LINE = 29;
 			const remoteProgram = await setUpRemoteProgram(remoteAttachConfig.port, server);
@@ -1070,7 +1069,6 @@ suite('Go Debug Adapter', function () {
 		// disconnectRequest is sent after it has already disconnected.
 
 		test('disconnect should work for remote attach', async () => {
-			this.timeout(30_000);
 			const server = await getPort();
 			const remoteProgram = await setUpRemoteProgram(remoteAttachConfig.port, server);
 
