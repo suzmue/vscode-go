@@ -835,7 +835,7 @@ It returns the number of bytes written and any write error encountered.
 		).then((results) => {
 			assert(results.some((result) => result.name === 'Mutex'));
 		});
-		return Promise.all([withIgnoringFolders]);
+		return Promise.all([withoutIgnoringFolders]);
 
 		// return Promise.all([withIgnoringFolders, withoutIgnoringFolders, withIncludingGoroot, withoutIncludingGoroot]);
 	});
