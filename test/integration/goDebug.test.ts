@@ -308,7 +308,7 @@ suite('Go Debug Adapter', function () {
 		dc.defaultTimeout = 40_000;
 
 		// To connect to a running debug server for debugging the tests, specify PORT.
-		return dc.start();
+		return dc.start(4711);
 	});
 
 	teardown(() => dc.stop());

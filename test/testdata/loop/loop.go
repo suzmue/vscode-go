@@ -2,6 +2,7 @@ package main
 
 func main() {
 	for {
-		print("Hello")
+		x := 5
+		x = x + 1
 	}
 }
