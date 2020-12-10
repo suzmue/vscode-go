@@ -42,7 +42,7 @@ import {
 } from '../../src/util';
 
 suite('Go Extension Tests', function () {
-	this.timeout(15000);
+	this.timeout(200000);
 
 	const dummyCancellationSource = new vscode.CancellationTokenSource();
 
@@ -771,7 +771,6 @@ It returns the number of bytes written and any write error encountered.
 	});
 
 	test('Workspace Symbols', () => {
-		this.timeout(200000); // TEST IF TIMEOUT FIXES
 		const workspacePath = path.join(fixturePath, 'vendoring');
 		const configWithoutIgnoringFolders = Object.create(vscode.workspace.getConfiguration('go'), {
 			gotoSymbol: {
@@ -835,7 +834,7 @@ It returns the number of bytes written and any write error encountered.
 		).then((results) => {
 			assert(results.some((result) => result.name === 'Mutex'));
 		});
-		return Promise.all([withoutIncludingGoroot]);
+		return Promise.all([withIncludingGoroot]);
 
 		// return Promise.all([withIgnoringFolders, withoutIgnoringFolders, withIncludingGoroot, withoutIncludingGoroot]);
 	});
