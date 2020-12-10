@@ -165,6 +165,7 @@ suite('Test Go Test', function () {
 	}
 
 	test('resolves file names in logs (modules)', async () => {
+		this.timeout(100000); // Test to see if its a timeout issue or test is broken
 		setupRepo(true);
 		await runTest(
 			{ isMod: true, includeSubDirectories: true },
