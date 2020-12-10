@@ -42,7 +42,7 @@ import {
 } from '../../src/util';
 
 suite('Go Extension Tests', function () {
-	this.timeout(200000);
+	this.timeout(20000);
 
 	const dummyCancellationSource = new vscode.CancellationTokenSource();
 
@@ -834,9 +834,8 @@ It returns the number of bytes written and any write error encountered.
 		).then((results) => {
 			assert(results.some((result) => result.name === 'Mutex'));
 		});
-		return Promise.all([withIncludingGoroot]);
 
-		// return Promise.all([withIgnoringFolders, withoutIgnoringFolders, withIncludingGoroot, withoutIncludingGoroot]);
+		return Promise.all([withIgnoringFolders, withoutIgnoringFolders, withIncludingGoroot, withoutIncludingGoroot]);
 	});
 
 	test('Test Completion', async () => {
