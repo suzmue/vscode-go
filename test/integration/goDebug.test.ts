@@ -282,7 +282,7 @@ suite('RemoteSourcesAndPackages Tests', () => {
 // Test suite adapted from:
 // https://github.com/microsoft/vscode-mock-debug/blob/master/src/tests/adapter.test.ts
 suite('Go Debug Adapter', function () {
-	this.timeout(60_000);
+	this.timeout(100_000);
 
 	const debugConfigProvider = new GoDebugConfigurationProvider();
 	const DEBUG_ADAPTER = path.join('.', 'out', 'src', 'debugAdapter', 'goDebug.js');
@@ -305,7 +305,7 @@ suite('Go Debug Adapter', function () {
 		dc = new DebugClient('node', path.join(PROJECT_ROOT, DEBUG_ADAPTER), 'go');
 
 		// Launching delve may take longer than the default timeout of 5000.
-		dc.defaultTimeout = 40_000;
+		dc.defaultTimeout = 50_000;
 
 		// To connect to a running debug server for debugging the tests, specify PORT.
 		return dc.start();
@@ -843,7 +843,6 @@ suite('Go Debug Adapter', function () {
 		});
 
 		test('stopped for a breakpoint set during initialization (remote attach)', async () => {
-			// BROKEN
 			const FILE = path.join(DATA_ROOT, 'helloWorldServer', 'main.go');
 			const BREAKPOINT_LINE = 29;
 			const remoteProgram = await setUpRemoteProgram(remoteAttachConfig.port, server);
