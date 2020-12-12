@@ -48,7 +48,7 @@ const declinedInstalls: Tool[] = [];
 
 export async function installAllTools(updateExistingToolsOnly: boolean = false) {
 	const goVersion = await getGoVersion();
-	let allTools = getConfiguredTools(goVersion);
+	let allTools = getConfiguredTools(goVersion, getGoConfig());
 
 	// exclude tools replaced by alternateTools.
 	const alternateTools: { [key: string]: string } = getGoConfig().get('alternateTools');
@@ -94,10 +94,14 @@ export async function installAllTools(updateExistingToolsOnly: boolean = false) 
  * @param missing array of tool names and optionally, their versions to be installed.
  *                If a tool's version is not specified, it will install the latest.
  * @param goVersion version of Go that affects how to install the tool. (e.g. modules vs legacy GOPATH mode)
+ * @returns a list of tools that failed to install.
  */
-export async function installTools(missing: ToolAtVersion[], goVersion: GoVersion): Promise<void> {
+export async function installTools(
+	missing: ToolAtVersion[],
+	goVersion: GoVersion
+): Promise<{ tool: ToolAtVersion, reason: string }[]> {
 	if (!missing) {
-		return;
+		return [];
 	}
 
 	outputChannel.show();
@@ -173,6 +177,7 @@ export async function installTools(missing: ToolAtVersion[], goVersion: GoVersio
 			outputChannel.appendLine(`${failure.tool.name}: ${failure.reason} `);
 		}
 	}
+	return failures;
 }
 
 export async function installTool(
@@ -204,7 +209,9 @@ export async function installTool(
 	// the current directory path. In order to avoid choosing a different go,
 	// we will explicitly use `GOROOT/bin/go` instead of goVersion.binaryPath
 	// (which can be a wrapper script that switches 'go').
-	const goBinary = path.join(getCurrentGoRoot(), 'bin', correctBinname('go'));
+	const goBinary = getCurrentGoRoot() ?
+		path.join(getCurrentGoRoot(), 'bin', correctBinname('go')) :
+		goVersion.binaryPath;
 
 	// Build the arguments list for the tool installation.
 	const args = ['get', '-v'];
@@ -238,7 +245,7 @@ export async function installTool(
 		logVerbose(`install: %s %s\n%s%s`, goBinary, args.join(' '), stdout, stderr);
 
 		if (hasModSuffix(tool)) {  // Actual installation of the -gomod tool is done by running go build.
-			const gopath = env['GOBIN'] ?? env['GOPATH'];
+			const gopath = env['GOBIN'] || env['GOPATH'];
 			if (!gopath) {
 				return `GOBIN/GOPATH not configured in environment`;
 			}
@@ -449,8 +456,9 @@ export async function offerToInstallTools() {
 				title: 'Show',
 				command() {
 					outputChannel.clear();
+					outputChannel.show();
 					outputChannel.appendLine('Below tools are needed for the basic features of the Go extension.');
-					missing.forEach((x) => outputChannel.appendLine(x.name));
+					missing.forEach((x) => outputChannel.appendLine(`  ${x.name}`));
 				}
 			};
 			vscode.window
@@ -495,7 +503,7 @@ export async function offerToInstallTools() {
 }
 
 function getMissingTools(goVersion: GoVersion): Promise<Tool[]> {
-	const keys = getConfiguredTools(goVersion);
+	const keys = getConfiguredTools(goVersion, getGoConfig());
 	return Promise.all<Tool>(
 		keys.map(
 			(tool) =>
