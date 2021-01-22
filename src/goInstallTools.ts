@@ -11,6 +11,7 @@ import path = require('path');
 import { SemVer } from 'semver';
 import util = require('util');
 import vscode = require('vscode');
+import { getGoConfig } from './config';
 import { toolExecutionEnvironment, toolInstallationEnvironment } from './goEnv';
 import { addGoRuntimeBaseToPATH, clearGoRuntimeBaseFromPATH } from './goEnvironmentStatus';
 import { getLanguageServerToolPath } from './goLanguageServer';
@@ -31,7 +32,6 @@ import {
 import {
 	getBinPath,
 	getBinPathWithExplanation,
-	getGoConfig,
 	getGoVersion,
 	getTempFilePath,
 	getWorkspaceFolderPath,
@@ -94,10 +94,14 @@ export async function installAllTools(updateExistingToolsOnly: boolean = false) 
  * @param missing array of tool names and optionally, their versions to be installed.
  *                If a tool's version is not specified, it will install the latest.
  * @param goVersion version of Go that affects how to install the tool. (e.g. modules vs legacy GOPATH mode)
+ * @returns a list of tools that failed to install.
  */
-export async function installTools(missing: ToolAtVersion[], goVersion: GoVersion): Promise<void> {
+export async function installTools(
+	missing: ToolAtVersion[],
+	goVersion: GoVersion
+): Promise<{ tool: ToolAtVersion, reason: string }[]> {
 	if (!missing) {
-		return;
+		return [];
 	}
 
 	outputChannel.show();
@@ -173,6 +177,7 @@ export async function installTools(missing: ToolAtVersion[], goVersion: GoVersio
 			outputChannel.appendLine(`${failure.tool.name}: ${failure.reason} `);
 		}
 	}
+	return failures;
 }
 
 export async function installTool(
@@ -240,7 +245,7 @@ export async function installTool(
 		logVerbose(`install: %s %s\n%s%s`, goBinary, args.join(' '), stdout, stderr);
 
 		if (hasModSuffix(tool)) {  // Actual installation of the -gomod tool is done by running go build.
-			const gopath = env['GOBIN'] ?? env['GOPATH'];
+			const gopath = env['GOBIN'] || env['GOPATH'];
 			if (!gopath) {
 				return `GOBIN/GOPATH not configured in environment`;
 			}
