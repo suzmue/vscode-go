@@ -4,6 +4,7 @@
  *--------------------------------------------------------*/
 
 import vscode = require('vscode');
+import { logError } from './goLogging';
 
 let globalState: vscode.Memento;
 let workspaceState: vscode.Memento;
@@ -50,4 +51,29 @@ export function setWorkspaceState(state: vscode.Memento) {
 
 export function getWorkspaceState(): vscode.Memento {
 	return workspaceState;
+}
+
+export function getAllKeys(state: vscode.Memento): string[] {
+	try {
+		// tslint:disable-next-line: no-any
+		if ((state as any)._value) {
+			// tslint:disable-next-line: no-any
+			const keys = Object.keys((state as any)._value);
+			return keys;
+		}
+	} catch (e) {
+		logError('Error getting global keys', e);
+	}
+	return [];
+}
+
+export async function resetGlobalKey() {
+	const keys = getAllKeys(globalState);
+
+	vscode.window.showQuickPick(keys).then((item) => {
+		if (!!item) {
+			updateGlobalState(item, undefined);
+		}
+	});
+
 }

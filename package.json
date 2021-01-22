@@ -405,6 +405,11 @@
         "command": "go.workspace.isTrusted.toggle",
         "title": "Go: Toggle Workspace Trust Flag",
         "description": "Toggle the workspace trust flag. Workspace settings that determine tool locations are disabled by default in untrusted workspaces."
+      },
+      {
+        "command": "go.reset.globalState",
+        "title": "Go: Reset global state (Extension Developer)",
+        "description": "Reset the global state of a key in storage."
       }
     ],
     "breakpoints": [

@@ -53,7 +53,8 @@ import { subTestAtCursor, testAtCursor, testCurrentFile, testCurrentPackage, tes
 import { getConfiguredTools } from './goTools';
 import { vetCode } from './goVet';
 import {
-	getFromGlobalState, getFromWorkspaceState, setGlobalState, setWorkspaceState, updateGlobalState,
+	getAllKeys,
+	getFromGlobalState, getFromWorkspaceState, resetGlobalKey, setGlobalState, setWorkspaceState, updateGlobalState,
 	updateWorkspaceState
 } from './stateUtils';
 import { cancelRunningTests, showTestOutput } from './testUtils';
@@ -501,6 +502,11 @@ https://github.com/golang/vscode-go/issues/50.`;
 	ctx.subscriptions.push(vscode.commands.registerCommand('go.extractServerChannel', () => {
 		showServerOutputChannel();
 	}));
+	ctx.subscriptions.push(
+		vscode.commands.registerCommand('go.reset.globalState', async () => {
+			resetGlobalKey();
+		})
+	);
 
 	ctx.subscriptions.push(
 		vscode.commands.registerCommand('go.welcome', () => {
